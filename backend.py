@@ -24,9 +24,7 @@ logger = logging.getLogger(__name__)
 
 class LegalRAGSystem:
     def __init__(self, cache_dir=".cache"):
-
-        login(token=os.environ["HUGGINGFACE_TOKEN"])
-
+        # Initialize torch first
         _ = torch.zeros(1)
         
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -44,7 +42,7 @@ class LegalRAGSystem:
 
     def _get_cache_path(self, key):
         return self.cache_dir / f"{hashlib.md5(key.encode()).hexdigest()}.pkl"
-    
+
     def _load_dataset_with_retry(self):
         """Load dataset with retry logic for timeout handling."""
         for attempt in range(self.max_retries):
@@ -52,7 +50,7 @@ class LegalRAGSystem:
                 return load_dataset(
                     "opennyaiorg/InJudgements_dataset", 
                     split="train",
-                    download_mode="force_redownload" if attempt > 0 else "reuse_dataset_if_exists"
+                    use_auth_token=True  # Add authentication for gated repo
                 )
             except (ReadTimeout, ConnectionError) as e:
                 if attempt == self.max_retries - 1:
@@ -68,10 +66,12 @@ class LegalRAGSystem:
             dataset = self._load_dataset_with_retry()
             df = pd.DataFrame(dataset)
             
+            # Select and rename columns
             df = df[['Titles', 'Court_Name', 'Text', 'Case_Type', 'Court_Type']].rename(
                 columns={'Titles': 'title', 'Court_Name': 'court', 'Text': 'text'}
             )
             
+            # Preprocess text
             df['text'] = df['text'].str.replace(r'\s+', ' ', regex=True).str.strip()
             df = df.dropna(subset=['text'])
             df = df[df['text'].str.len() > 500]

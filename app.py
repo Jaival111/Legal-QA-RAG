@@ -1,6 +1,8 @@
 import streamlit as st
 from backend import LegalRAGSystem
 from huggingface_hub import login
+import os
+import time
 
 login(token=st.secrets["HUGGINGFACE_TOKEN"])
 
@@ -10,23 +12,53 @@ st.set_page_config(
     layout="wide"
 )
 
+def get_huggingface_token():
+    """Get HF token from secrets or environment variables."""
+    try:
+        # Try Streamlit secrets first
+        return st.secrets["HUGGINGFACE_TOKEN"]
+    except (KeyError, AttributeError):
+        # Fallback to environment variable
+        return os.getenv("HUGGINGFACE_TOKEN")
+
 @st.cache_resource(show_spinner=False)
 def initialize_system():
     """Initialize the RAG system with proper error handling."""
     try:
-        with st.spinner("Initializing legal AI system..."):
+        with st.spinner("Initializing legal AI system (this may take several minutes)..."):
             rag_system = LegalRAGSystem()
             
+            # Step 1: Load data
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            
+            status_text.text("Loading legal documents...")
             rag_system.df = rag_system.load_data()
+            progress_bar.progress(33)
             
+            status_text.text("Initializing AI models...")
             rag_system.initialize_models()
+            progress_bar.progress(66)
             
+            status_text.text("Generating document embeddings...")
             rag_system.generate_embeddings()
+            progress_bar.progress(100)
+            
+            status_text.text("System ready!")
+            time.sleep(1)
+            status_text.empty()
             
             return rag_system
             
     except Exception as e:
-        st.error(f"System initialization failed: {str(e)}")
+        st.error(f"""
+        System initialization failed: {str(e)}
+        
+        Common solutions:
+        1. Check your internet connection
+        2. Verify your Hugging Face token is valid
+        3. Try again later if Hugging Face is experiencing high load
+        """)
         st.stop()
 
 def display_results(query, result, rag_system):
