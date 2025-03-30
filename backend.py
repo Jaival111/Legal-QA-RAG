@@ -8,12 +8,10 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 from typing import List, Dict
 import logging
 import warnings
-import hashlib
 from pathlib import Path
 import time
 from requests.exceptions import ReadTimeout
 import os
-from huggingface_hub import login
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 os.environ['KMP_WARNINGS'] = '0'
@@ -24,7 +22,6 @@ logger = logging.getLogger(__name__)
 
 class LegalRAGSystem:
     def __init__(self, cache_dir=".cache"):
-        # Initialize torch first
         _ = torch.zeros(1)
         
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -38,7 +35,7 @@ class LegalRAGSystem:
         self.max_context_length = 2000
         self.full_text_cache = {}
         self.max_retries = 3
-        self.timeout = 60  # Increased timeout
+        self.timeout = 60
 
     def _load_dataset_with_retry(self):
         """Load dataset with retry logic and proper authentication."""
@@ -67,7 +64,6 @@ class LegalRAGSystem:
             dataset = self._load_dataset_with_retry()
             df = pd.DataFrame(dataset)
             
-            # Processing remains the same
             df = df[['Titles', 'Court_Name', 'Text', 'Case_Type', 'Court_Type']].rename(
                 columns={'Titles': 'title', 'Court_Name': 'court', 'Text': 'text'}
             )

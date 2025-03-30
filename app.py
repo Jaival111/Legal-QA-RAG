@@ -1,10 +1,5 @@
 import streamlit as st
 from backend import LegalRAGSystem
-from huggingface_hub import login
-import os
-import time
-
-login(token=st.secrets["HUGGINGFACE_TOKEN"])
 
 st.set_page_config(
     page_title="Indian Legal Document Search",
@@ -12,76 +7,23 @@ st.set_page_config(
     layout="wide"
 )
 
-def get_huggingface_token():
-    """Get HF token from secrets or environment variables."""
-    try:
-        # Try Streamlit secrets first
-        return st.secrets["HUGGINGFACE_TOKEN"]
-    except (KeyError, AttributeError):
-        # Fallback to environment variable
-        return os.getenv("HUGGINGFACE_TOKEN")
-
-def validate_environment():
-    """Check for required environment variables."""
-    if not os.getenv("HF_TOKEN") and not os.getenv("HUGGINGFACE_TOKEN"):
-        st.error("""
-        🔑 Authentication required. Please configure:
-        1. For local development: Set HF_TOKEN environment variable
-        2. For Streamlit Cloud: Add to Settings → Secrets as HF_TOKEN
-        """)
-        st.stop()
-
-def check_environment():
-    """Validate required environment variables."""
-    if not os.getenv("HF_TOKEN") and not os.getenv("HUGGINGFACE_TOKEN"):
-        st.error("""
-        🔐 Authentication Required
-        
-        Please set up your Hugging Face token:
-        1. For local dev: Run `export HF_TOKEN=your_token`
-        2. For Streamlit: Add to Settings → Secrets
-        """)
-        st.stop()
-
 @st.cache_resource(show_spinner=False)
 def initialize_system():
-    """Initialize system with deployment-friendly settings."""
-    check_environment()
-    
+    """Initialize the RAG system with proper error handling."""
     try:
-        with st.spinner("🔄 Initializing system (may take 2-3 minutes)..."):
+        with st.spinner("Initializing legal AI system..."):
             rag_system = LegalRAGSystem()
             
-            # Step-by-step initialization with progress
-            steps = [
-                ("Loading legal documents", rag_system.load_data),
-                ("Initializing AI models", rag_system.initialize_models),
-                ("Processing documents", rag_system.generate_embeddings)
-            ]
+            rag_system.df = rag_system.load_data()
             
-            progress_bar = st.progress(0)
-            status = st.empty()
+            rag_system.initialize_models()
             
-            for i, (message, func) in enumerate(steps):
-                status.markdown(f"**Step {i+1}/{len(steps)}:** {message}...")
-                func()
-                progress_bar.progress((i + 1) / len(steps))
+            rag_system.generate_embeddings()
             
-            status.success("✅ System ready!")
-            time.sleep(1)
             return rag_system
             
     except Exception as e:
-        st.error(f"""
-        🛑 Initialization failed
-        
-        Error: {str(e)}
-        
-        Solutions:
-        1. Check your Hugging Face token
-        2. Verify internet connection
-        3. Try again later if servers are busy
-        """)
+        st.error(f"System initialization failed: {str(e)}")
         st.stop()
 
 def display_results(query, result, rag_system):
