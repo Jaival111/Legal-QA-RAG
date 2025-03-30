@@ -176,3 +176,4 @@ cython_debug/
 # Local configuration file
 .streamlit/secrets.toml
 .cache/
+*.pkl

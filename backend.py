@@ -45,17 +45,21 @@ class LegalRAGSystem:
 
     def _load_dataset_with_retry(self):
         """Load dataset with retry logic for timeout handling."""
+        hf_token = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACE_TOKEN")
+        
         for attempt in range(self.max_retries):
             try:
                 return load_dataset(
                     "opennyaiorg/InJudgements_dataset", 
                     split="train",
-                    use_auth_token=True  # Add authentication for gated repo
+                    token=hf_token,
+                    num_proc=4 if attempt > 0 else 1  # Use more processes after first failure
                 )
-            except (ReadTimeout, ConnectionError) as e:
+            except Exception as e:
                 if attempt == self.max_retries - 1:
+                    logger.error(f"Final attempt failed to load dataset: {str(e)}")
                     raise
-                wait_time = (attempt + 1) * 5
+                wait_time = (attempt + 1) * 10
                 logger.warning(f"Attempt {attempt + 1} failed. Retrying in {wait_time} seconds...")
                 time.sleep(wait_time)
 

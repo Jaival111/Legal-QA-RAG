@@ -21,43 +21,55 @@ def get_huggingface_token():
         # Fallback to environment variable
         return os.getenv("HUGGINGFACE_TOKEN")
 
+def validate_environment():
+    """Check for required environment variables."""
+    if not os.getenv("HF_TOKEN") and not os.getenv("HUGGINGFACE_TOKEN"):
+        st.error("""
+        🔑 Authentication required. Please configure:
+        1. For local development: Set HF_TOKEN environment variable
+        2. For Streamlit Cloud: Add to Settings → Secrets as HF_TOKEN
+        """)
+        st.stop()
+
 @st.cache_resource(show_spinner=False)
 def initialize_system():
-    """Initialize the RAG system with proper error handling."""
+    """Initialize the RAG system with comprehensive error handling."""
+    validate_environment()
+    
     try:
-        with st.spinner("Initializing legal AI system (this may take several minutes)..."):
+        with st.spinner("🚀 Initializing legal AI system. This may take 2-3 minutes..."):
             rag_system = LegalRAGSystem()
             
-            # Step 1: Load data
-            progress_bar = st.progress(0)
-            status_text = st.empty()
+            # Track progress
+            status = st.empty()
+            progress = st.progress(0)
             
-            status_text.text("Loading legal documents...")
+            status.markdown("**Step 1/3:** Loading legal documents...")
             rag_system.df = rag_system.load_data()
-            progress_bar.progress(33)
+            progress.progress(33)
             
-            status_text.text("Initializing AI models...")
+            status.markdown("**Step 2/3:** Loading AI models...")
             rag_system.initialize_models()
-            progress_bar.progress(66)
+            progress.progress(66)
             
-            status_text.text("Generating document embeddings...")
+            status.markdown("**Step 3/3:** Processing documents...")
             rag_system.generate_embeddings()
-            progress_bar.progress(100)
+            progress.progress(100)
             
-            status_text.text("System ready!")
+            status.success("✅ System ready!")
             time.sleep(1)
-            status_text.empty()
+            status.empty()
             
             return rag_system
             
     except Exception as e:
         st.error(f"""
-        System initialization failed: {str(e)}
+        🛑 Initialization failed: {str(e)}
         
-        Common solutions:
-        1. Check your internet connection
-        2. Verify your Hugging Face token is valid
-        3. Try again later if Hugging Face is experiencing high load
+        Troubleshooting:
+        1. Check your Hugging Face token is valid
+        2. Verify internet connection
+        3. Try reducing model size if memory issues occur
         """)
         st.stop()
 
