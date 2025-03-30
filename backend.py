@@ -26,7 +26,7 @@ class LegalRAGSystem:
     def __init__(self, cache_dir=".cache"):
 
         login(token=os.environ["HUGGINGFACE_TOKEN"])
-        
+
         _ = torch.zeros(1)
         
         self.device = "cuda" if torch.cuda.is_available() else "cpu"

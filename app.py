@@ -1,9 +1,8 @@
 import streamlit as st
 from backend import LegalRAGSystem
-import os
 from huggingface_hub import login
 
-login(token=os.environ["HUGGINGFACE_TOKEN"])
+login(token=st.secrets["HUGGINGFACE_TOKEN"])
 
 st.set_page_config(
     page_title="Indian Legal Document Search",
