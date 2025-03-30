@@ -31,45 +31,56 @@ def validate_environment():
         """)
         st.stop()
 
+def check_environment():
+    """Validate required environment variables."""
+    if not os.getenv("HF_TOKEN") and not os.getenv("HUGGINGFACE_TOKEN"):
+        st.error("""
+        🔐 Authentication Required
+        
+        Please set up your Hugging Face token:
+        1. For local dev: Run `export HF_TOKEN=your_token`
+        2. For Streamlit: Add to Settings → Secrets
+        """)
+        st.stop()
+
 @st.cache_resource(show_spinner=False)
 def initialize_system():
-    """Initialize the RAG system with comprehensive error handling."""
-    validate_environment()
+    """Initialize system with deployment-friendly settings."""
+    check_environment()
     
     try:
-        with st.spinner("🚀 Initializing legal AI system. This may take 2-3 minutes..."):
+        with st.spinner("🔄 Initializing system (may take 2-3 minutes)..."):
             rag_system = LegalRAGSystem()
             
-            # Track progress
+            # Step-by-step initialization with progress
+            steps = [
+                ("Loading legal documents", rag_system.load_data),
+                ("Initializing AI models", rag_system.initialize_models),
+                ("Processing documents", rag_system.generate_embeddings)
+            ]
+            
+            progress_bar = st.progress(0)
             status = st.empty()
-            progress = st.progress(0)
             
-            status.markdown("**Step 1/3:** Loading legal documents...")
-            rag_system.df = rag_system.load_data()
-            progress.progress(33)
-            
-            status.markdown("**Step 2/3:** Loading AI models...")
-            rag_system.initialize_models()
-            progress.progress(66)
-            
-            status.markdown("**Step 3/3:** Processing documents...")
-            rag_system.generate_embeddings()
-            progress.progress(100)
+            for i, (message, func) in enumerate(steps):
+                status.markdown(f"**Step {i+1}/{len(steps)}:** {message}...")
+                func()
+                progress_bar.progress((i + 1) / len(steps))
             
             status.success("✅ System ready!")
             time.sleep(1)
-            status.empty()
-            
             return rag_system
             
     except Exception as e:
         st.error(f"""
-        🛑 Initialization failed: {str(e)}
+        🛑 Initialization failed
         
-        Troubleshooting:
-        1. Check your Hugging Face token is valid
+        Error: {str(e)}
+        
+        Solutions:
+        1. Check your Hugging Face token
         2. Verify internet connection
-        3. Try reducing model size if memory issues occur
+        3. Try again later if servers are busy
         """)
         st.stop()
 

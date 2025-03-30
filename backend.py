@@ -38,51 +38,44 @@ class LegalRAGSystem:
         self.max_context_length = 2000
         self.full_text_cache = {}
         self.max_retries = 3
-        self.timeout = 30
-
-    def _get_cache_path(self, key):
-        return self.cache_dir / f"{hashlib.md5(key.encode()).hexdigest()}.pkl"
+        self.timeout = 60  # Increased timeout
 
     def _load_dataset_with_retry(self):
-        """Load dataset with retry logic for timeout handling."""
+        """Load dataset with retry logic and proper authentication."""
         hf_token = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACE_TOKEN")
         
         for attempt in range(self.max_retries):
             try:
                 return load_dataset(
-                    "opennyaiorg/InJudgements_dataset", 
+                    "opennyaiorg/InJudgements_dataset",
                     split="train",
                     token=hf_token,
-                    num_proc=4 if attempt > 0 else 1  # Use more processes after first failure
+                    download_mode="force_redownload" if attempt > 0 else "reuse_dataset_if_exists"
                 )
             except Exception as e:
                 if attempt == self.max_retries - 1:
-                    logger.error(f"Final attempt failed to load dataset: {str(e)}")
+                    logger.error(f"Final attempt failed: {str(e)}")
                     raise
-                wait_time = (attempt + 1) * 10
-                logger.warning(f"Attempt {attempt + 1} failed. Retrying in {wait_time} seconds...")
+                wait_time = (attempt + 1) * 15
+                logger.warning(f"Attempt {attempt+1} failed, retrying in {wait_time}s...")
                 time.sleep(wait_time)
 
     def load_data(self) -> pd.DataFrame:
-        """Load and preprocess the legal documents dataset."""
-        logger.info("Loading Indian legal documents...")
+        """Load dataset with fresh download each time."""
+        logger.info("Downloading legal documents...")
         try:
             dataset = self._load_dataset_with_retry()
             df = pd.DataFrame(dataset)
             
-            # Select and rename columns
+            # Processing remains the same
             df = df[['Titles', 'Court_Name', 'Text', 'Case_Type', 'Court_Type']].rename(
                 columns={'Titles': 'title', 'Court_Name': 'court', 'Text': 'text'}
             )
-            
-            # Preprocess text
             df['text'] = df['text'].str.replace(r'\s+', ' ', regex=True).str.strip()
-            df = df.dropna(subset=['text'])
-            df = df[df['text'].str.len() > 500]
+            return df.dropna(subset=['text']).loc[df['text'].str.len() > 500]
             
-            return df
         except Exception as e:
-            logger.error(f"Error loading dataset: {e}")
+            logger.error(f"Data loading failed: {str(e)}")
             raise
 
     def initialize_models(self):
