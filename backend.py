@@ -13,6 +13,7 @@ from pathlib import Path
 import time
 from requests.exceptions import ReadTimeout
 import os
+from huggingface_hub import login
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 os.environ['KMP_WARNINGS'] = '0'
@@ -23,6 +24,9 @@ logger = logging.getLogger(__name__)
 
 class LegalRAGSystem:
     def __init__(self, cache_dir=".cache"):
+
+        login(token=os.environ["HUGGINGFACE_TOKEN"])
+        
         _ = torch.zeros(1)
         
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
