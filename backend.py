@@ -14,21 +14,15 @@ import time
 from requests.exceptions import ReadTimeout
 import os
 
-# Suppress TensorFlow warnings
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 os.environ['KMP_WARNINGS'] = '0'
 warnings.filterwarnings("ignore", category=UserWarning, module='tensorflow')
 
-# Suppress warnings
-warnings.filterwarnings("ignore")
-
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class LegalRAGSystem:
     def __init__(self, cache_dir=".cache"):
-        # Initialize torch first
         _ = torch.zeros(1)
         
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -42,7 +36,7 @@ class LegalRAGSystem:
         self.max_context_length = 2000
         self.full_text_cache = {}
         self.max_retries = 3
-        self.timeout = 30  # Increased timeout to 30 seconds
+        self.timeout = 30
 
     def _get_cache_path(self, key):
         return self.cache_dir / f"{hashlib.md5(key.encode()).hexdigest()}.pkl"
@@ -70,12 +64,10 @@ class LegalRAGSystem:
             dataset = self._load_dataset_with_retry()
             df = pd.DataFrame(dataset)
             
-            # Select and rename columns
             df = df[['Titles', 'Court_Name', 'Text', 'Case_Type', 'Court_Type']].rename(
                 columns={'Titles': 'title', 'Court_Name': 'court', 'Text': 'text'}
             )
             
-            # Preprocess text
             df['text'] = df['text'].str.replace(r'\s+', ' ', regex=True).str.strip()
             df = df.dropna(subset=['text'])
             df = df[df['text'].str.len() > 500]
@@ -90,13 +82,11 @@ class LegalRAGSystem:
         logger.info("Initializing models...")
         
         try:
-            # Initialize embedding model
             self.embedding_model = SentenceTransformer(
                 "all-mpnet-base-v2",
                 device=self.device
             )
             
-            # Initialize LLM with timeout handling
             model_name = "mistralai/Mistral-7B-Instruct-v0.1"
             for attempt in range(self.max_retries):
                 try:
@@ -162,15 +152,14 @@ class LegalRAGSystem:
         results = []
         for idx in top_indices:
             doc = self.df.iloc[idx]
-            # Store full text in cache
             doc_id = f"{doc['title']}_{idx}"
             self.full_text_cache[doc_id] = doc['text']
             
             results.append({
                 "score": float(similarities[idx]),
                 "title": doc['title'],
-                "text": doc['text'][:self.max_context_length],  # Preview text
-                "full_text_id": doc_id,  # Reference to full text
+                "text": doc['text'][:self.max_context_length],
+                "full_text_id": doc_id,
                 "court": doc['court'],
                 "case_type": doc['Case_Type'],
                 "court_type": doc['Court_Type']
