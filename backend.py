@@ -39,7 +39,7 @@ class LegalRAGSystem:
 
     def _load_dataset_with_retry(self):
         """Load dataset with retry logic and proper authentication."""
-        hf_token = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACE_TOKEN")
+        hf_token = os.getenv("HUGGINGFACE_TOKEN")
         
         for attempt in range(self.max_retries):
             try:
@@ -57,8 +57,8 @@ class LegalRAGSystem:
                 logger.warning(f"Attempt {attempt+1} failed, retrying in {wait_time}s...")
                 time.sleep(wait_time)
 
-    def load_data(self) -> pd.DataFrame:
-        """Load dataset with fresh download each time."""
+    def load_data(self, test_mode: bool = False, test_size: int = 1000) -> pd.DataFrame:
+        """Load dataset with fresh download each time, with option to limit for testing."""
         logger.info("Downloading legal documents...")
         try:
             dataset = self._load_dataset_with_retry()
@@ -68,7 +68,16 @@ class LegalRAGSystem:
                 columns={'Titles': 'title', 'Court_Name': 'court', 'Text': 'text'}
             )
             df['text'] = df['text'].str.replace(r'\s+', ' ', regex=True).str.strip()
-            return df.dropna(subset=['text']).loc[df['text'].str.len() > 500]
+            
+            # Filter for quality documents first
+            df = df.dropna(subset=['text']).loc[df['text'].str.len() > 500]
+            
+            # Limit to test_size documents if in test mode
+            if test_mode:
+                logger.info(f"Running in test mode - limiting to {test_size} documents")
+                df = df.head(test_size)
+                
+            return df
             
         except Exception as e:
             logger.error(f"Data loading failed: {str(e)}")
@@ -106,10 +115,15 @@ class LegalRAGSystem:
             logger.error(f"Error initializing models: {e}")
             raise
 
-    def generate_embeddings(self, batch_size: int = 32):
-        """Generate document embeddings with error checking."""
+    def generate_embeddings(self, batch_size: int = 32, test_mode: bool = False, test_size: int = 1000):
+        """Generate document embeddings with error checking and test mode support."""
         if self.embedding_model is None:
             raise ValueError("Embedding model not initialized. Call initialize_models() first.")
+            
+        # If in test mode and we have more documents than test_size, limit them
+        if test_mode and len(self.df) > test_size:
+            self.df = self.df.head(test_size)
+            logger.info(f"Test mode active - using first {test_size} documents for embeddings")
             
         logger.info(f"Generating embeddings for {len(self.df)} documents...")
         texts = self.df['text'].tolist()
@@ -210,3 +224,4 @@ class LegalRAGSystem:
             outputs[0][inputs.input_ids.shape[1]:],
             skip_special_tokens=True
         )
+    
